@@ -77,101 +77,42 @@ def get_test_mean_ci(cfgs, idx):
 
 def seqreproduction_long_compare_delay_analysis():
     cfgs = experiments.seqreproduction_long_compare_delay()
-    model_list = ['RNN_Gradient', 'RNN_Non-Plastic', 'LSTM_Gradient', 'LSTM_Non-Plastic']
+    model_list = ['RNN', 'LSTM']
+    rule_list = ['gradient', 'hebbian', 'none', ]
 
-    for j, delay in enumerate([0, 10, 20, 40]):
-
-        performance = []
-
-        for i, model in enumerate(model_list):
-            curve, x_axis = get_curve(cfgs, i + j * 4, key='TestLoss', start=1)
-            performance.append(curve)
-
-        plots.error_range_plot(
-            x_axis,
-            performance,
-            x_label='Training Step',
-            y_label='Validation Loss',
-            label_list=model_list,
-            fig_dir='seq',
-            fig_name=f'long_delay{delay}'
-        )
-
-def seqreproduction_short_compare_delay_analysis():
-    cfgs = experiments.seqreproduction_short_compare_delay()
-    model_list = ['RNN_Gradient', 'RNN_Non-Plastic', 'LSTM_Gradient', 'LSTM_Non-Plastic']
-
-    for j, delay in enumerate([10, 20, 30]):
-
-        performance = []
+    for j, delay in enumerate([0, 20, 40]):
 
         for i, model in enumerate(model_list):
-            curve, x_axis = get_curve(cfgs, i + j * 4, key='TestLoss', start=1)
-            performance.append(curve)
 
-        plots.error_range_plot(
-            x_axis,
-            performance,
-            x_label='Training Step',
-            y_label='Validation Loss',
-            label_list=model_list,
-            fig_dir='seq',
-            fig_name=f'short_delay{delay}'
-        )
+            performance = []
+            for k, rule in enumerate(rule_list):
 
-def cuereward_analysis():
-    
-    cfgs = experiments.cuereward()
-    model_list = ['RNN_Gradient', 'RNN_Non-Plastic', 'LSTM_Gradient', 'LSTM_Non-Plastic']
-    performance = []
+                curve, x_axis = get_curve(cfgs, (i + j * 2) * 3 + k, key='TestLoss', start=1)
+                performance.append(curve)
 
-    for i, model in enumerate(model_list):
-
-        curve, x_axis = get_curve(cfgs, i, key='TestLoss', start=1)
-        performance.append(curve)
-
-    plots.error_range_plot(
-        x_axis,
-        performance,
-        x_label='Training Step',
-        y_label='Validation Loss',
-        label_list=model_list,
-        fig_dir='cuereward',
-        fig_name=f'compare_plasticity'
-    )
+            plots.error_range_plot(
+                x_axis,
+                performance,
+                x_label='Training Step',
+                y_label=f'{model} Validation Loss',
+                label_list=rule_list,
+                fig_dir='seq',
+                fig_name=f'{model}_delay{delay}'
+            )
 
 def cuereward_large_analysis():
     
     cfgs = experiments.cuereward_large()
-    model_list = ['RNN_Gradient', 'RNN_Non-Plastic', 'LSTM_Gradient', 'LSTM_Non-Plastic']
+    model_list = ['RNN', 'LSTM']
+    rule_list = ['gradient', 'hebbian', 'none', ]
     performance = []
 
     for i, model in enumerate(model_list):
 
-        curve, x_axis = get_curve(cfgs, i, key='TestLoss', start=1)
-        performance.append(curve)
-
-    plots.error_range_plot(
-        x_axis,
-        performance,
-        x_label='Training Step',
-        y_label='Validation Loss',
-        label_list=model_list,
-        fig_dir='cuereward',
-        fig_name=f'compare_plasticity_large'
-    )
-
-def cuereward_inner_lr_mode_analysis():
-
-    cfgs = experiments.cuereward_inner_lr_mode()
-    model_list = ['none', 'uniform', 'random']
-
-    for j, rnn in enumerate(['RNN', 'LSTM']):
         performance = []
+        for k, rule in enumerate(rule_list):
 
-        for i, model in enumerate(model_list):
-
-            curve, x_axis = get_curve(cfgs, i + j * 3, key='TestLoss', start=1)
+            curve, x_axis = get_curve(cfgs, i * 3 + k, key='TestLoss', start=1)
             performance.append(curve)
 
         plots.error_range_plot(
@@ -179,10 +120,58 @@ def cuereward_inner_lr_mode_analysis():
             performance,
             x_label='Training Step',
             y_label='Validation Loss',
-            label_list=model_list,
+            label_list=rule_list,
             fig_dir='cuereward',
-            fig_name=f'inner_lr_{rnn}'
+            fig_name=f'curves_{model}'
         )
+
+def cuereward_modulation_analysis():
+    
+    cfgs = experiments.cuereward_modulation()
+    model_list = ['RNN-gradient', 'RNN-hebbian', 'LSTM-gradient', 'LSTM-hebbian']
+    rule_list = ['modulated', 'non-modulated', ]
+    performance = []
+
+    for i, model in enumerate(model_list):
+
+        performance = []
+        for k, rule in enumerate(rule_list):
+            curve, x_axis = get_curve(cfgs, i * 2 + k, key='TestLoss', start=1)
+            performance.append(curve)
+
+        plots.error_range_plot(
+            x_axis,
+            performance,
+            x_label='Training Step',
+            y_label='Validation Loss',
+            label_list=rule_list,
+            fig_dir='cuereward',
+            fig_name=f'curves_modulation_{model}'
+        )
+
+def cuereward_inner_lr_mode_analysis():
+
+    cfgs = experiments.cuereward_inner_lr_mode()
+    model_list = ['none', 'uniform', 'neg_uniform', 'random']
+
+    for k, rule in enumerate(['gradient', 'hebbian']):
+        for j, rnn in enumerate(['RNN', 'LSTM']):
+            performance = []
+
+            for i, model in enumerate(model_list):
+
+                curve, x_axis = get_curve(cfgs, i + (j + k * 2) * 4, key='TestLoss', start=1)
+                performance.append(curve)
+
+            plots.error_range_plot(
+                x_axis,
+                performance,
+                x_label='Training Step',
+                y_label='Validation Loss',
+                label_list=model_list,
+                fig_dir='cuereward',
+                fig_name=f'inner_lr_{rule}_{rnn}'
+            )
 
 def cuereward_lr_analysis():
     cfgs = experiments.cuereward_lr()
@@ -210,47 +199,51 @@ def cuereward_extradim_analysis():
     cfgs = experiments.cuereward_extradim()
 
     models = ['RNN', 'LSTM', ]
-    performances = []
     x_axis = [0, 4, 8, 16]
 
-    for i, model in enumerate(models):
+    for j, rule in enumerate(['gradient', 'hebbian']):
 
-        performances.append([])
-        for idx, d in enumerate(x_axis):
-            performances[-1].append(get_performance(cfgs, i * 4 + idx))
+        performances = []
+        for i, model in enumerate(models):
 
-    plots.errorbar_plot(
-        x_axis,
-        performances,
-        'Dim',
-        'Validation Error',
-        models,
-        fig_dir='cuereward',
-        fig_name='extradim'
-    )
+            performances.append([])
+            for idx, d in enumerate(x_axis):
+                performances[-1].append(get_performance(cfgs, (i + j * 2) * len(x_axis) + idx))
+
+        plots.errorbar_plot(
+            x_axis,
+            performances,
+            'dim',
+            'Validation Error',
+            models,
+            fig_dir='cuereward',
+            fig_name=f'extradim_{rule}'
+        )
 
 def cuereward_plr_analysis():
     cfgs = experiments.cuereward_plr()
 
     models = ['RNN', 'LSTM', ]
-    performances = []
-    x_axis = [0.02, 0.05, 0.1, 0.2]
+    x_axis = [0, 0.025, 0.05, 0.1, 0.2]
 
-    for i, model in enumerate(models):
+    for j, rule in enumerate(['gradient', 'hebbian']):
 
-        performances.append([])
-        for idx, d in enumerate(x_axis):
-            performances[-1].append(get_performance(cfgs, i * 4 + idx))
+        performances = []
+        for i, model in enumerate(models):
 
-    plots.errorbar_plot(
-        x_axis,
-        performances,
-        'Inner lr',
-        'Validation Error',
-        models,
-        fig_dir='cuereward',
-        fig_name='innerlr'
-    )
+            performances.append([])
+            for idx, d in enumerate(x_axis):
+                performances[-1].append(get_performance(cfgs, (i + j * 2) * len(x_axis) + idx))
+
+        plots.errorbar_plot(
+            x_axis,
+            performances,
+            'Inner lr',
+            'Validation Error',
+            models,
+            fig_dir='cuereward',
+            fig_name=f'innerlr_{rule}'
+        )
 
 def fsc_analysis():
     cfgs = experiments.fsc()

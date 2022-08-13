@@ -102,7 +102,7 @@ def model_train(config: SupervisedLearningBaseConfig):
 
     # gradient clipping
     if config.grad_clip is not None:
-        logging.info("Performs grad clipping with max norm {}" + str(config.grad_clip))
+        logging.info("Performs grad clipping with max norm " + str(config.grad_clip))
 
     # initialize task
     task_func = task_init(config)
@@ -210,6 +210,11 @@ def model_train(config: SupervisedLearningBaseConfig):
     net.load_state_dict(torch.load(osp.join(config.save_path, 'net_best.pth')))
 
     if config.perform_test:
+
+        np.random.seed(NP_SEED)
+        torch.manual_seed(TCH_SEED)
+        random.seed(0)
+
         test_data = DatasetIters(config, 'test', config.batch_size)
         logger = Logger(output_dir=config.save_path, output_fname='test.txt', exp_name=config.experiment_name)
 

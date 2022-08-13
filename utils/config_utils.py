@@ -48,7 +48,7 @@ def auto_name(configs_dict, config_diffs):
             # replace char that are not suitable for path
             name = name.replace(",", "").replace(" ", "_")
             name = name.replace("[", "_").replace("]", "_").replace(".", "_")
-            name = name.replace("'", "")
+            name = name.replace("'", "").replace("/", '_')
             config.model_name = name + '_s' + str(seed)
             config.save_path = os.path.join(ROOT_DIR, 'experiments',
                                             config.experiment_name, config.model_name)

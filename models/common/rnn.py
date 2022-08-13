@@ -1,4 +1,4 @@
-__all__ = ['PlasticRNNCell', 'PlasticLSTMCell', 'VanillaRNNCell']
+__all__ = ['PlasticRNNCell', 'HebbianRNNCell', 'PlasticLSTMCell', 'HebbianLSTMCell', 'VanillaRNNCell']
 
 from .linear import *
 from .activation import *
@@ -20,6 +20,15 @@ class PlasticRNNCell(nn.Module):
     def forward(self, x: torch.Tensor, hx: torch.Tensor):
         x = F.relu(self.h_fc(hx) + self.i_fc(x))
         return x
+
+class HebbianRNNCell(PlasticRNNCell):
+
+    def forward(self, x: torch.Tensor, hx: torch.Tensor):
+        out = super().forward(x, hx)
+        self.h_fc.w.pre = hx
+        self.i_fc.w.pre = x
+        self.h_fc.w.post = self.i_fc.w.post = out
+        return out
     
 class PlasticLSTMCell(nn.Module):
 
@@ -38,6 +47,27 @@ class PlasticLSTMCell(nn.Module):
         forgetgate = torch.sigmoid(forgetgate)
         cellgate = torch.tanh(cellgate)
         outgate = torch.sigmoid(outgate)
+
+        cy = (forgetgate * cx) + (ingate * cellgate)
+        hy = outgate * torch.tanh(cy)
+        return hy, cy
+
+class HebbianLSTMCell(PlasticLSTMCell):
+
+    def forward(self, x, hidden):
+        hx, cx = hidden
+        gates = self.h_fc(hx) + self.i_fc(x)
+        ingate, forgetgate, cellgate, outgate = gates.chunk(4, dim=-1)
+
+        ingate = torch.sigmoid(ingate)
+        forgetgate = torch.sigmoid(forgetgate)
+        cellgate = torch.tanh(cellgate)
+        outgate = torch.sigmoid(outgate)
+
+        post = torch.cat([ingate, forgetgate, cellgate, outgate], dim=-1)
+        self.h_fc.w.pre = hx
+        self.i_fc.w.pre = x
+        self.h_fc.w.post = self.i_fc.w.post = post
 
         cy = (forgetgate * cx) + (ingate * cellgate)
         hy = outgate * torch.tanh(cy)

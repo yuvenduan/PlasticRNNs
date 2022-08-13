@@ -145,16 +145,46 @@ class FSC:
 
     def __init__(self, config: FSCConfig):
 
-        self.criterion = nn.CrossEntropyLoss()
-        
+        self.criterion = nn.CrossEntropyLoss(label_smoothing=config.label_smoothing)
         self.way = config.train_way
         self.shot = config.train_shot
         self.query = config.train_query
+        self.randomize_order = config.randomize_train_order
 
     def roll(self, model, data_batch, train=False, test=False, evaluate=False):
         assert train + test + evaluate == 1, "only one mode should be activated"
         
         img_support, labels_support, img_query, labels_query, _, _ = data_batch_to_device(data_batch)
+
+        if not self.randomize_order:
+            assert self.shot == 1
+
+            new_labels_query = []
+            new_labels_support = []
+
+            for support, query in zip(labels_support.unbind(0), labels_query.unbind(0)):
+
+                # print(support)
+                # print(query)
+
+                indices = [0 for _ in range(self.way)] # a mapping from the original labels to new labels
+                for j in range(self.way):
+                    indices[support[j]] = j
+                    support[j] = j
+
+                for j in range(self.query * self.way):
+                    query[j] = indices[query[j]]
+
+                new_labels_query.append(query)
+                new_labels_support.append(support)
+
+                # print(support)
+                # print(query)
+                # exit(0)
+
+            labels_query = torch.stack(new_labels_query)
+            labels_support = torch.stack(new_labels_support)
+
         onehot_support = F.one_hot(labels_support, num_classes=self.way)
 
         pred_num = 0
@@ -164,8 +194,9 @@ class FSC:
         bsz = img_support.shape[0]
         hidden = torch.zeros((bsz, model.memory_size), device=DEVICE)
 
-        for img, input in zip(img_support.unbind(1), onehot_support.unbind(1)):
-            _, hidden = model((img, input), hidden)
+        for img, input, label in zip(img_support.unbind(1), onehot_support.unbind(1), labels_support.unbind(1)):
+            out, hidden = model((img, input), hidden)
+            # task_loss += self.criterion(out, label)
 
         for img, label in zip(img_query.unbind(1), labels_query.unbind(1)):
             out, hidden = model((img, torch.zeros_like(onehot_support[:, 0])), hidden)

@@ -9,17 +9,10 @@ import os.path as osp
 import torchvision.transforms as trans
 
 from configs.configs import RLBaseConfig
+from stable_baselines3.common.atari_wrappers import AtariWrapper
 
 from utils.logger import Logger
 from configs.config_global import DEVICE
-
-# Set run dir
-def reshape_reward(obs, action, reward, done):
-    if not done:
-        reward = -1
-    else:
-        reward = 1
-    return reward
 
 def rl_train(config: RLBaseConfig, model: nn.Module, logger: Logger):
 
@@ -27,21 +20,31 @@ def rl_train(config: RLBaseConfig, model: nn.Module, logger: Logger):
     envs = []
     for i in range(config.num_envs):
         env = gym.make(config.env, **config.env_kwargs)
-        env = gym.wrappers.TimeLimit(env, max_episode_steps=config.horizon)
+        if config.atari:
+            env = AtariWrapper(env, clip_reward=False, terminal_on_life_loss=False)
         env.seed(config.seed + 10000 * i)
         envs.append(env)
         
     logging.info("Environments loaded\n")
 
+    if len(config.input_shape) == 3:
+        image_transform = trans.ToTensor()
+    else: 
+        def image_transform(obs: np.ndarray):
+            return torch.from_numpy(obs.astype(np.float32) / 255)
+
     def transform(obs, device):
-        image_transform = trans.Compose([
-            trans.ToPILImage(),
-            trans.Resize((210, 160)),
-            trans.ToTensor()
-        ])
         obs = [image_transform(ob) for ob in obs]
+        # print(obs)
+        # exit(0)
         obs = torch.stack(obs)
         return obs.to(device)
+
+    if config.clip_reward:
+        def normalize_reward(observation, action, reward, done):
+            return np.sign(reward)
+    else:
+        normalize_reward = None
 
     # Load algo
     if config.algo == "a2c":
@@ -52,7 +55,8 @@ def rl_train(config: RLBaseConfig, model: nn.Module, logger: Logger):
             entropy_coef=config.entropy_coef,
             recurrence=config.recurrence,
             max_grad_norm=config.grad_clip,
-            preprocess_obss=transform
+            preprocess_obss=transform,
+            reshape_reward=normalize_reward
         )
 
     elif config.algo == "ppo":
@@ -66,7 +70,8 @@ def rl_train(config: RLBaseConfig, model: nn.Module, logger: Logger):
             batch_size=config.batch_size,
             epochs=config.num_ep,
             clip_eps=config.clip_epsilon,
-            preprocess_obss=transform
+            preprocess_obss=transform,
+            reshape_reward=normalize_reward
         )
     else:
         raise ValueError("Incorrect algorithm name: {}".format(config.algo))
@@ -92,11 +97,11 @@ def rl_train(config: RLBaseConfig, model: nn.Module, logger: Logger):
         fps = logs["num_frames"] / (update_end_time - update_start_time)
         duration = int(time.time() - start_time)
         return_per_episode = np.mean(logs["return_per_episode"])
-        # rreturn_per_episode = np.mean(logs["reshaped_return_per_episode"])
+        rreturn_per_episode = np.mean(logs["reshaped_return_per_episode"])
         num_frames_per_episode = np.mean(logs["num_frames_per_episode"])
 
-        header = ["return_per_episode", "num_frames_per_episode"]
-        data = [return_per_episode, num_frames_per_episode]
+        header = ["return_per_episode", "reshaped_return_per_episode", "num_frames_per_episode"]
+        data = [return_per_episode, rreturn_per_episode, num_frames_per_episode]
 
         header += ["FPS", ]
         data += [fps, ]

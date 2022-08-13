@@ -49,16 +49,28 @@ def get_rnn(rnn_type, plastic_mode, rnn_in_size, hidden_size):
         rnn = models.PlasticRNNCell(rnn_in_size, hidden_size)
     elif rnn_type == 'LSTM' and plastic_mode == 'gradient':
         rnn = models.PlasticLSTMCell(rnn_in_size, hidden_size)
+    elif rnn_type == 'RNN' and plastic_mode == 'hebbian':
+        rnn = models.HebbianRNNCell(rnn_in_size, hidden_size)
+    elif rnn_type == 'LSTM' and plastic_mode == 'hebbian':
+        rnn = models.HebbianLSTMCell(rnn_in_size, hidden_size)
     else:
         raise NotImplementedError('RNN not implemented')
 
     return rnn
 
-def get_linear(plastic_mode, in_size, out_size):
+def get_linear(plastic_mode, in_size, out_size, activation='none'):
     if plastic_mode == 'none':
-        layer = models.Linear(in_size, out_size)
+        layer = nn.Sequential(
+            models.Linear(in_size, out_size),
+            models.Activation(activation)
+        )
     elif plastic_mode == 'gradient':
-        layer = models.PlasticLinear(in_size, out_size)
+        layer = nn.Sequential(
+            models.PlasticLinear(in_size, out_size),
+            models.Activation(activation)
+        )
+    elif plastic_mode == 'hebbian':
+        layer = models.HebbLinear(in_size, out_size, activation=activation)
     else:
         raise NotImplementedError('Layer not implemented')
 

@@ -24,20 +24,31 @@ class SimpleRNN(models.PlasticModule):
         assert len(config.input_shape) == 1 or custom_input, "input must be 1-dim for SimpleRNN"
 
         if not custom_input:
-            self.in_fc = nn.Sequential(
-                get_linear(config.plasticity_mode, config.input_shape[0], config.hidden_size),
-                nn.ReLU(),
+            self.in_fc = get_linear(
+                config.plasticity_mode, 
+                config.input_shape[0], 
+                config.hidden_size, 
+                activation='relu'
             )
+
         self.custom_input = custom_input
 
         self.rnn = get_rnn(config.rnn, config.plasticity_mode, config.hidden_size, config.hidden_size)
-        self.out_fc = get_linear(config.plasticity_mode, config.hidden_size, config.model_outsize + config.extra_dim)
+        self.full_outsize = config.model_outsize + config.extra_dim + config.modulation
+        self.out_fc = get_linear(
+            config.plasticity_mode, 
+            config.hidden_size, 
+            self.full_outsize
+        )
         self.rnn_type = config.rnn
 
+        self.plasticity_mode = config.plasticity_mode
         self.dim = self.get_floatparam_dim()
         self.hidden_size = config.hidden_size
         self.out_dim = config.model_outsize
-        
+        self.modulation = config.modulation
+        self.out_weight = nn.Parameter(torch.ones((self.full_outsize, )))
+               
         self.lr = config.p_lr
         self.wd = config.p_wd
         self.grad_clip = config.inner_grad_clip
@@ -68,10 +79,17 @@ class SimpleRNN(models.PlasticModule):
                 h = self.layernorm(h)
             x = self.out_fc(h)
 
-        loss = F.mse_loss(x, torch.zeros_like(x))
+        loss = F.mse_loss(x * self.out_weight, torch.zeros_like(x))
 
         if self.dim > 0:
-            floatparam = self.update_floatparam(loss, self.lr, self.wd, self.grad_clip)
+            lr = torch.full_like(x[:, -1], self.lr)
+            wd = torch.full_like(x[:, -1], self.wd)
+
+            if self.modulation:
+                lr = lr * torch.sigmoid(x[:, -1]) * 2
+                wd = wd * torch.sigmoid(x[:, -1]) * 2
+
+            floatparam = self.update_floatparam(loss, lr, wd, self.grad_clip, mode=self.plasticity_mode)
             h = torch.cat([floatparam, h], dim=1)
 
         return x[:, :self.out_dim], h
@@ -120,32 +138,37 @@ class RecurrentPolicy(SimpleRNN):
 
     def __init__(self, config: BaseConfig):
 
-        super().__init__(config, custom_input=True)
-
         if len(config.input_shape) == 3:
+            super().__init__(config, custom_input=True)
             self.encoder = nn.Sequential(
-                nn.Conv2d(3, 16, (7, 7), 4),
+                nn.Conv2d(config.input_shape[0], 32, (8, 8), 4),
                 nn.ReLU(),
-                nn.Conv2d(16, 32, (3, 3), 2),
+                nn.Conv2d(32, 64, (4, 4), 2),
                 nn.ReLU(),
-                nn.Conv2d(32, 64, (3, 3), 2),
+                nn.Conv2d(64, 64, (3, 3), 1),
                 nn.ReLU(),
                 nn.Flatten()
             )
             input_size = self.encoder(torch.rand(config.input_shape).unsqueeze(0)).shape[1]
+            self.proj = nn.Sequential(
+                get_linear("none", input_size, config.hidden_size),
+                nn.ReLU()
+            )
+            self.custom_input = True
+
         elif len(config.input_shape) == 1:
-            self.encoder = nn.Identity()
-            input_size = config.input_shape[0]
+            super().__init__(config)
+            self.custom_input = False
+
         else:
             raise ValueError(config.input_shape)
 
-        self.proj = nn.Sequential(
-            get_linear("none", input_size, config.hidden_size),
-            nn.ReLU()
-        )
-
     def forward(self, input, hidden):
-        embedding = self.proj(self.encoder(input))
+        if self.custom_input:
+            embedding = self.proj(self.encoder(input))
+        else:
+            embedding = input
+
         out, hidden = super().forward(embedding, hidden)
         value = out[:, 0]
         dist = torch.distributions.Categorical(logits=out[:, 1: ])

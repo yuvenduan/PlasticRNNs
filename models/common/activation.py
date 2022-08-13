@@ -4,7 +4,7 @@ __all__ = ['Activation']
 import torch
 import torch.nn as nn
 
-class Activation( nn.Module):
+class Activation(nn.Module):
 
     def __init__(self, type, **kwargs):
         super().__init__()

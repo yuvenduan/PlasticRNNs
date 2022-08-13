@@ -7,6 +7,7 @@ jason save and load can preserve. each field cannot be complicated data type
 """
 
 
+from os import truncate
 from tkinter.tix import Tree
 
 
@@ -54,9 +55,10 @@ class BaseConfig(object):
         self.inner_lr_mode = 'random'
         self.p_lr = 0.1
         self.p_wd = 0.1
-        self.inner_grad_clip = 5
+        self.inner_grad_clip = 1
         self.extra_dim = 4
         self.extra_input_dim = 0
+        self.modulation = True
 
         self.input_shape = (1, )
         # output size of the model, which is the number of classes in classification tasks
@@ -81,6 +83,8 @@ class RLBaseConfig(BaseConfig):
 
         self.training_mode = 'RL'
         self.env = None
+        self.atari = False
+        self.clip_reward = False
 
         # max norm of grad clipping, eg. 1.0 or None
         self.grad_clip = 0.5
@@ -91,6 +95,7 @@ class RLBaseConfig(BaseConfig):
         self.algo = 'a2c'
         self.env_kwargs = dict()
         self.horizon = 100
+        self.max_step = 1000000
 
         self.num_envs = 8
         self.cpu = 4
@@ -120,7 +125,7 @@ class SupervisedLearningBaseConfig(BaseConfig):
         self.training_mode = 'supervised'
 
         # max norm of grad clipping, eg. 1.0 or None
-        self.grad_clip = None
+        self.grad_clip = 5
 
         # optimizer
         self.batch_size = 20
@@ -217,6 +222,9 @@ class FSCConfig(SupervisedLearningBaseConfig):
         self.train_query = 1
         self.model_outsize = 5
         self.extra_input_dim = 5
+
+        self.randomize_train_order = True
+        self.label_smoothing = 0
         
         self.test_batch = 200
         self.log_every = 1000

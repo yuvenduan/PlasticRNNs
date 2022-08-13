@@ -47,7 +47,7 @@ def cuereward():
 
     config_ranges = OrderedDict()
     config_ranges['rnn'] = ['RNN', 'LSTM', ]
-    config_ranges['plasticity_mode'] = ['gradient', 'none',  ]
+    config_ranges['plasticity_mode'] = ['hebbian', 'gradient', 'none', ]
 
     configs = vary_config(config, config_ranges, mode='combinatorial', num_seed=4)
 
@@ -59,11 +59,11 @@ def cuereward_lr():
     config = CueRewardConfig()
 
     config.experiment_name = 'cuereward_lr'
-
+    
     config_ranges = OrderedDict()
-    config_ranges['lr'] = [0.01, 0.001, 0.0003]
+    config_ranges['lr'] = [0.01, 0.0003]
     config_ranges['rnn'] = ['RNN', 'LSTM', ]
-    config_ranges['plasticity_mode'] = ['gradient', 'none',  ]
+    config_ranges['plasticity_mode'] = ['gradient', 'hebbian', 'none',  ]
 
     configs = vary_config(config, config_ranges, mode='combinatorial', num_seed=4)
 
@@ -75,26 +75,23 @@ def cuereward_plr():
     config = CueRewardConfig()
 
     config.experiment_name = 'cuereward_plr'
-    config.plasticity_mode = 'gradient'
 
     config_ranges = OrderedDict()
-    
+    config_ranges['plasticity_mode'] = ['gradient', 'hebbian']
     config_ranges['rnn'] = ['RNN', 'LSTM', ]
-    config_ranges['p_lr'] = [0.02, 0.05, 0.1, 0.2]
+    config_ranges['p_lr'] = [0, 0.025, 0.05, 0.1, 0.2, ]
 
     configs = vary_config(config, config_ranges, mode='combinatorial', num_seed=4)
     set_equal_lr_wd(configs)
-
+    scale_rnn_modelsize(configs)
     return configs
 
 def cuereward_extradim():
     config = CueRewardConfig()
-
     config.experiment_name = 'cuereward_extradim'
-    config.plasticity_mode = 'gradient'
 
     config_ranges = OrderedDict()
-    
+    config_ranges['plasticity_mode'] = ['gradient', 'hebbian']
     config_ranges['rnn'] = ['RNN', 'LSTM', ]
     config_ranges['extra_dim'] = [0, 4, 8, 16]
 
@@ -108,7 +105,22 @@ def cuereward_large():
 
     config_ranges = OrderedDict()
     config_ranges['rnn'] = ['RNN', 'LSTM', ]
-    config_ranges['plasticity_mode'] = ['gradient', 'none',  ]
+    config_ranges['plasticity_mode'] = ['gradient', 'hebbian', 'none',  ]
+
+    configs = vary_config(config, config_ranges, mode='combinatorial', num_seed=4)
+    scale_modelsize(configs, 1.5)
+    scale_rnn_modelsize(configs)
+
+    return configs
+
+def cuereward_modulation():
+    config = CueRewardConfig()
+    config.experiment_name = 'cuereward_modulation'
+
+    config_ranges = OrderedDict()
+    config_ranges['rnn'] = ['RNN', 'LSTM', ]
+    config_ranges['plasticity_mode'] = ['gradient', 'hebbian', ]
+    config_ranges['modulation'] = [True, False]
 
     configs = vary_config(config, config_ranges, mode='combinatorial', num_seed=4)
     scale_modelsize(configs, 1.5)
@@ -119,11 +131,11 @@ def cuereward_large():
 def cuereward_inner_lr_mode():
     config = CueRewardConfig()
     config.experiment_name = 'cuereward_inner_lr_mode'
-    config.plasticity_mode = 'gradient'
 
     config_ranges = OrderedDict()
+    config_ranges['plasticity_mode'] = ['gradient', 'hebbian']
     config_ranges['rnn'] = ['RNN', 'LSTM', ]
-    config_ranges['inner_lr_mode'] = ['none', 'uniform', 'random']
+    config_ranges['inner_lr_mode'] = ['none', 'uniform', 'neg_uniform', 'random']
 
     configs = vary_config(config, config_ranges, mode='combinatorial', num_seed=4)
     return configs
@@ -136,7 +148,7 @@ def seqreproduction_long_compare_delay():
     config_ranges = OrderedDict()
     config_ranges['delay'] = [0, 20, 40]
     config_ranges['rnn'] = ['RNN', 'LSTM', ]
-    config_ranges['plasticity_mode'] = ['gradient', 'none',  ]
+    config_ranges['plasticity_mode'] = ['gradient', 'hebbian', 'none', ]
 
     configs = vary_config(config, config_ranges, mode='combinatorial', num_seed=4)
 
@@ -167,8 +179,8 @@ def fsc():
 
     config_ranges = OrderedDict()
     config_ranges['image_dataset'] = ['CIFAR_FS', 'miniImageNet', ]
-    config_ranges['plasticity_mode'] = ['gradient', 'none', ]
-    config_ranges['rnn'] = ['LSTM', 'RNN']
+    config_ranges['plasticity_mode'] = ['gradient', 'hebbian', 'none', ]
+    config_ranges['rnn'] = ['RNN', 'LSTM', ]
 
     configs = vary_config(config, config_ranges, mode='combinatorial', num_seed=4)
 
@@ -288,6 +300,21 @@ def fsc_extradim():
     configure_image_dataset(configs)
     return configs
 
+def fsc_inner_lr_mode():
+    config = FSCConfig()
+    config.experiment_name = 'fsc_inner_lr_mode'
+
+    config_ranges = OrderedDict()
+    config_ranges['image_dataset'] = ['CIFAR_FS', 'miniImageNet', ]
+    config_ranges['plasticity_mode'] = ['gradient', 'hebbian', ]
+    config_ranges['rnn'] = ['RNN', ]
+    config_ranges['inner_lr_mode'] = ['none', 'uniform', 'random']
+
+    configs = vary_config(config, config_ranges, mode='combinatorial', num_seed=4)
+    scale_rnn_modelsize(configs)
+    configure_image_dataset(configs)
+    return configs
+
 def fsc_pretrain():
     config = FSCConfig()
     config.experiment_name = 'fsc_pretrain'
@@ -380,33 +407,63 @@ def contrastive_pretrain():
 
     return configs
 
-def atari_test():
+def atari():
     config = RLBaseConfig()
 
-    config.experiment_name = 'atari_test'
-    config.env = "ALE/Pong-v5"
+    config.experiment_name = 'atari'
     config.model_outsize = 19
 
-    config.env_kwargs = dict(full_action_space=True)
-    config.input_shape = (3, 210, 160)
-    config.horizon = 100
+    config.env_kwargs = dict(full_action_space=True, frameskip=1)
+    config.input_shape = (1, 84, 84)
+    
     config.hidden_size = 128
     config.recurrence = 100
-    config.log_every = 100
+    config.horizon = 100
+    config.log_every = 50
 
     config.algo = 'a2c'
-    config.max_batch = 20000
+    config.max_batch = 6250
     config.inner_grad_clip = 1
+    config.extra_dim = 16
 
     config_ranges = OrderedDict()
-    config_ranges['num_envs'] = [8, ]
-    config_ranges['lr'] = [0.001, ]
-    config_ranges['extra_dim'] = [4, 16, 64, ]
+    config_ranges['env'] = ["ALE/Alien-v5", "ALE/Pong-v5", "ALE/Amidar-v5"]
     config_ranges['plasticity_mode'] = ['gradient', 'none', ]
     config_ranges['rnn'] = ['RNN', ]
 
     configs = vary_config(config, config_ranges, mode='combinatorial', num_seed=4)
     scale_modelsize(configs)
+    
+    return configs
+
+def atari_ram():
+    config = RLBaseConfig()
+
+    config.experiment_name = 'atari_ram'
+    config.model_outsize = 19
+
+    config.env_kwargs = dict(full_action_space=True, obs_type='ram')
+    config.input_shape = (128, )
+    
+    config.hidden_size = 128
+    config.recurrence = 100
+    config.horizon = 100
+    config.log_every = 50
+
+    config.algo = 'a2c'
+    config.max_batch = 10000
+    config.layernorm = True
+    config.extra_dim = 16
+    config.clip_reward = True
+
+    config_ranges = OrderedDict()
+    config_ranges['env'] = ["ALE/Alien-v5", "ALE/Pong-v5", "ALE/Amidar-v5"]
+    config_ranges['plasticity_mode'] = ['gradient', 'none', ]
+    config_ranges['rnn'] = ['RNN', ]
+
+    configs = vary_config(config, config_ranges, mode='combinatorial', num_seed=4)
+    scale_modelsize(configs)
+    
     return configs
 
 def ant():
