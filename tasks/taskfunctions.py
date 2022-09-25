@@ -6,7 +6,7 @@ import os.path as osp
 
 from configs.config_global import DEVICE
 import torchvision.transforms as transform
-from configs.configs import BaseConfig, ContrastivePretrainConfig, FSCConfig
+from configs.configs import BaseConfig, ContrastivePretrainConfig, FSCConfig, SupervisedLearningBaseConfig
 
 from utils.logger import Logger
 
@@ -108,11 +108,12 @@ class Classification:
 
 class SeqRegression:
 
-    def __init__(self, config):
+    def __init__(self, config: SupervisedLearningBaseConfig):
 
         self.criterion = nn.MSELoss()
         self.batch_size = config.batch_size
         self.test_begin = config.test_begin
+        self.do_analysis = config.do_analysis
 
     def roll(self, model, data_batch, train=False, test=False, evaluate=False):
         assert train + test + evaluate == 1, "only one mode should be activated"
@@ -124,9 +125,11 @@ class SeqRegression:
         task_loss = 0
         
         hidden = torch.zeros((input.shape[0], model.memory_size), device=DEVICE)
+        info_list = []
 
         for t, (x, y) in enumerate(zip(input.unbind(1), target.unbind(1))):
-            out, hidden = model(x, hidden)
+            out, hidden, info = model(x, hidden, detail=True)
+            info_list.append(info)
             if t >= self.test_begin:
                 task_loss = task_loss + self.criterion(out, y)
 
@@ -137,9 +140,31 @@ class SeqRegression:
         if train:
             return task_loss
         elif test or evaluate:
-            return task_loss.item(), pred_num, sum_error
+            return task_loss.item(), pred_num, sum_error, info_list
         else:
             raise NotImplementedError("Not Implemented")
+    
+    def after_validation_callback(self, out, logger, save_path):
+
+        if not self.do_analysis:
+            return
+
+        seq_length = len(out[0][-1])
+        lr_list = [[] for _ in range(seq_length)]
+
+        for batch in out:
+            for i in range(seq_length):
+                lr_list[i].append(batch[-1][i]['lr'])
+
+        for i in range(seq_length):
+            lr_list[i] = torch.stack(lr_list[i])
+        
+        lr_info = (
+            [x.mean().item() for x in lr_list],
+            [x.std().item() for x in lr_list]
+        )
+        # print(lr_info)
+        torch.save(lr_info, osp.join(save_path, 'lr_info.pth'))
 
 class FSC:
 
@@ -198,12 +223,13 @@ class FSC:
             out, hidden = model((img, input), hidden)
             # task_loss += self.criterion(out, label)
 
-        for img, label in zip(img_query.unbind(1), labels_query.unbind(1)):
+        for i, (img, label) in enumerate(zip(img_query.unbind(1), labels_query.unbind(1))):
             out, hidden = model((img, torch.zeros_like(onehot_support[:, 0])), hidden)
             task_loss += self.criterion(out, label)
 
-            correct_num += (torch.argmax(out, dim=-1) == label).sum().item()
-            pred_num += bsz
+            if i == 0:
+                correct_num += (torch.argmax(out, dim=-1) == label).sum().item()
+                pred_num += bsz
 
         task_loss = task_loss / img_query.shape[1]
 

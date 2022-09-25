@@ -58,19 +58,19 @@ def get_rnn(rnn_type, plastic_mode, rnn_in_size, hidden_size):
 
     return rnn
 
-def get_linear(plastic_mode, in_size, out_size, activation='none'):
+def get_linear(plastic_mode, in_size, out_size, activation='none', fan_in=False):
     if plastic_mode == 'none':
         layer = nn.Sequential(
-            models.Linear(in_size, out_size),
+            models.Linear(in_size, out_size, fan_in=fan_in),
             models.Activation(activation)
         )
     elif plastic_mode == 'gradient':
         layer = nn.Sequential(
-            models.PlasticLinear(in_size, out_size),
+            models.PlasticLinear(in_size, out_size, fan_in=fan_in),
             models.Activation(activation)
         )
     elif plastic_mode == 'hebbian':
-        layer = models.HebbLinear(in_size, out_size, activation=activation)
+        layer = models.HebbLinear(in_size, out_size, fan_in=fan_in, activation=activation)
     else:
         raise NotImplementedError('Layer not implemented')
 

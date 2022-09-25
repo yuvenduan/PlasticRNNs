@@ -1,8 +1,4 @@
-__all__ = ['SimpleRNN', 'CNNtoRNN', 'CNN', 'RecurrentPolicy']
-
-from copy import deepcopy
-import math
-import numpy as np
+__all__ = ['SimpleRNN', 'CNNtoRNN', 'CNN', ]
 
 import torch
 import torch.nn as nn
@@ -11,8 +7,8 @@ from configs.configs import BaseConfig
 from models.plastic.meta import PlasticParam
 
 from utils.model_utils import get_cnn, get_rnn, get_linear
+from configs.config_global import DEVICE
 import models
-import torch_ac as ac
 
 class SimpleRNN(models.PlasticModule):
 
@@ -20,6 +16,7 @@ class SimpleRNN(models.PlasticModule):
         super().__init__()
 
         PlasticParam.set_elementwise_lr(config.inner_lr_mode)
+        PlasticParam.set_param_grad(not config.random_network)
 
         assert len(config.input_shape) == 1 or custom_input, "input must be 1-dim for SimpleRNN"
 
@@ -81,30 +78,39 @@ class SimpleRNN(models.PlasticModule):
 
         loss = F.mse_loss(x * self.out_weight, torch.zeros_like(x))
 
+        lr = torch.full_like(x[:, -1], self.lr)
+        wd = torch.full_like(x[:, -1], self.wd)
+
+        if self.modulation:
+            lr = lr * torch.sigmoid(x[:, -1]) * 2
+            wd = wd * torch.sigmoid(x[:, -1]) * 2
+
         if self.dim > 0:
-            lr = torch.full_like(x[:, -1], self.lr)
-            wd = torch.full_like(x[:, -1], self.wd)
-
-            if self.modulation:
-                lr = lr * torch.sigmoid(x[:, -1]) * 2
-                wd = wd * torch.sigmoid(x[:, -1]) * 2
-
             floatparam = self.update_floatparam(loss, lr, wd, self.grad_clip, mode=self.plasticity_mode)
             h = torch.cat([floatparam, h], dim=1)
 
-        return x[:, :self.out_dim], h
+        info = dict(
+            lr=lr.detach().cpu(),
+            wd=wd.detach().cpu(),
+            inner_loss=loss.detach().cpu()
+        )
 
-    def forward(self, input, hidden):
+        return x[:, :self.out_dim], h, info
+
+    def forward(self, input, hidden, detail=False):
 
         flag = torch.is_grad_enabled()
         with torch.enable_grad():
-            x, h = self._forward(input, hidden)
+            x, h, info = self._forward(input, hidden)
             
         if not flag:
             x = x.detach()
             h = h.detach()
 
-        return x, h
+        if detail:
+            return x, h, info
+        else:
+            return x, h
 
     @property
     def memory_size(self):
@@ -121,58 +127,16 @@ class CNNtoRNN(SimpleRNN):
         out_shape = self.cnn(torch.rand(config.input_shape).unsqueeze(0)).shape
 
         self.proj = nn.Sequential(
-            get_linear("none", out_shape[1], config.hidden_size - config.extra_input_dim),
+            get_linear("none", out_shape[1], config.hidden_size - config.extra_input_dim, fan_in=True),
             nn.ReLU()
         )
 
-    def forward(self, input, hidden):
+    def forward(self, input, hidden, **kwargs):
 
         img_input, extra_input = input
         embedding = self.proj(self.cnn(img_input))
         embedding = torch.cat((embedding, extra_input), dim=1)
-        return super().forward(embedding, hidden)
-
-class RecurrentPolicy(SimpleRNN):
-
-    recurrent = True
-
-    def __init__(self, config: BaseConfig):
-
-        if len(config.input_shape) == 3:
-            super().__init__(config, custom_input=True)
-            self.encoder = nn.Sequential(
-                nn.Conv2d(config.input_shape[0], 32, (8, 8), 4),
-                nn.ReLU(),
-                nn.Conv2d(32, 64, (4, 4), 2),
-                nn.ReLU(),
-                nn.Conv2d(64, 64, (3, 3), 1),
-                nn.ReLU(),
-                nn.Flatten()
-            )
-            input_size = self.encoder(torch.rand(config.input_shape).unsqueeze(0)).shape[1]
-            self.proj = nn.Sequential(
-                get_linear("none", input_size, config.hidden_size),
-                nn.ReLU()
-            )
-            self.custom_input = True
-
-        elif len(config.input_shape) == 1:
-            super().__init__(config)
-            self.custom_input = False
-
-        else:
-            raise ValueError(config.input_shape)
-
-    def forward(self, input, hidden):
-        if self.custom_input:
-            embedding = self.proj(self.encoder(input))
-        else:
-            embedding = input
-
-        out, hidden = super().forward(embedding, hidden)
-        value = out[:, 0]
-        dist = torch.distributions.Categorical(logits=out[:, 1: ])
-        return dist, value, hidden
+        return super().forward(embedding, hidden, **kwargs)
 
 class CNN(nn.Module):
 

@@ -1,3 +1,4 @@
+import colorsys
 import os
 import os.path as osp
 import numpy as np
@@ -8,14 +9,17 @@ from matplotlib.animation import FuncAnimation
 
 from configs.config_global import FIG_DIR, ROOT_DIR
 
-plt.rcParams.update({'font.size': 16})
+plt.rcParams.update({'font.size': 15})
 line_styles = ['-', '--', ':']
-# Default colors
-# colors = ['red', 'tomato', 'green', 'lightgreen', 'blue', 'lightblue']
+colors = [
+    (42 / 255, 70 / 255, 82 / 255), 
+    (61 / 255, 156 / 255, 143 / 255), 
+    (230 / 255, 195 / 255, 111 / 255), 
+    (239 / 255, 162 / 255, 101 / 255)
+]
 
 if not osp.exists(FIG_DIR):
     os.makedirs(FIG_DIR)
-
 
 def adjust_figure(ax=None):
     if ax is None:
@@ -159,37 +163,27 @@ def errorbar_plot(
     linewidth=2,
     capsize=4,
     capthick=2,
-    figsize=(6, 5),
-    special_index=-1
+    figsize=(5, 4),
+    color_list=colors,
+    add=0
 ):
     
     plt.figure(figsize=figsize)
 
-    for i, data, label in zip(range(len(data_list)), data_list, label_list):
+    for i, data, label, color in zip(range(len(data_list)), data_list, label_list, color_list):
 
-        if i != special_index:
-            mean = [np.mean(val) for val in data]
-            sem = [get_sem(val) for val in data]
+        mean = [np.mean(val) + i * add for val in data]
+        sem = [get_sem(val) for val in data]
 
-            plt.errorbar(
-                x_axis, 
-                mean, sem,
-                label=label,
-                linewidth=linewidth,
-                capsize=capsize,
-                capthick=capthick
-            )
-        else:
-            
-            plt.plot(
-                x_axis,
-                data,
-                label=label,
-                linestyle='dotted',
-                linewidth=linewidth,
-                marker='s',
-                color='gray'
-            )
+        plt.errorbar(
+            x_axis, 
+            mean, sem,
+            label=label,
+            linewidth=linewidth,
+            capsize=capsize,
+            capthick=capthick,
+            color=color
+        )
 
     plt.xlabel(x_label)
     plt.ylabel(y_label)
@@ -213,20 +207,20 @@ def error_range_plot(
     y_label,
     plot_title=None, 
     legend=True,
-    color_list=['orange', 'blue', 'green', 'tomato'],
+    color_list=colors,
     fill_vertical=None,
     label_list=[None, ],
-    font=14, 
+    font=15, 
     linewidth=2.5, 
     x_ticks=None,
     y_ticks=None,
     ylim=None,
     hline=None,
-    fig_size=(6, 5)
+    fig_size=(5, 4)
 ):
     """
     A general plot for error range
-    :param data_list: list of numpy arrays of shpae (n, len)
+    :param data_list: list of numpy arrays of shpae (len, n_seed)
     """
 
     fig_dir = osp.join(FIG_DIR, fig_dir)

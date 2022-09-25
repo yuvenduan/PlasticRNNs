@@ -85,6 +85,9 @@ def init_single_dataset(dataset_name, phase, b_size, config: SupervisedLearningB
     elif dataset_name == 'SeqReproduction':
         data_set = datasets.SeqReproduction(config)
 
+    elif dataset_name == 'Regression':
+        data_set = datasets.Regression(config)
+
     elif dataset_name == 'FSC':
         dataset = config.image_dataset
 

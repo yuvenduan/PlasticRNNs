@@ -6,11 +6,6 @@ Be aware that the each field in the configuration must be in basic data type tha
 jason save and load can preserve. each field cannot be complicated data type
 """
 
-
-from os import truncate
-from tkinter.tix import Tree
-
-
 class BaseConfig(object):
 
     def __init__(self):
@@ -59,6 +54,7 @@ class BaseConfig(object):
         self.extra_dim = 4
         self.extra_input_dim = 0
         self.modulation = True
+        self.random_network = False
 
         self.input_shape = (1, )
         # output size of the model, which is the number of classes in classification tasks
@@ -75,47 +71,6 @@ class BaseConfig(object):
 
     def __str__(self):
         return str(self.__dict__)
-
-class RLBaseConfig(BaseConfig):
-
-    def __init__(self):
-        super().__init__()
-
-        self.training_mode = 'RL'
-        self.env = None
-        self.atari = False
-        self.clip_reward = False
-
-        # max norm of grad clipping, eg. 1.0 or None
-        self.grad_clip = 0.5
-        self.num_ep = 3
-        self.clip_epsilon = 0.01
-        self.batch_size = 256
-        self.lr = 0.001
-        self.algo = 'a2c'
-        self.env_kwargs = dict()
-        self.horizon = 100
-        self.max_step = 1000000
-
-        self.num_envs = 8
-        self.cpu = 4
-
-        # training
-        self.max_batch = 5000
-        self.entropy_coef = 0.01
-        self.recurrence = 4
-
-        # evaluation
-        self.perform_val = True
-        self.perform_test = True
-        self.log_every = 100
-        self.save_every = 1000
-
-        # model
-        self.model_type = 'RecurrentPolicy'
-        self.rnn = 'RNN'
-        self.cnn = None
-        self.cnn_pretrain = 'none'
 
 class SupervisedLearningBaseConfig(BaseConfig):
 
@@ -156,6 +111,8 @@ class SupervisedLearningBaseConfig(BaseConfig):
         self.cnn_pretrain = 'none'
         self.freeze_pretrained_cnn = True
         self.pretrain_step = 10000
+
+        self.do_analysis = False
 
 class CueRewardConfig(SupervisedLearningBaseConfig):
 
@@ -199,11 +156,33 @@ class SeqReproductionConfig(SupervisedLearningBaseConfig):
         
         self.wdecay = 0
         self.batch_size = 64
-        self.max_batch = 20000
+        self.max_batch = 10000
+        self.print_mode = 'error'
 
-        self.grad_clip = 5
-        self.inner_grad_clip = 1
+class RegressionConfig(SupervisedLearningBaseConfig):
 
+    def __init__(self):
+        super().__init__()
+
+        self.task_type = 'SeqRegression'
+        self.dataset = 'Regression'
+
+        self.seq_length = 0
+        self.delay = 0
+        self.train_length = 20
+        self.test_length = 20
+
+        self.input_shape = (12, )
+        self.input_noise = 0.1
+        self.model_outsize = 1
+
+        self.model_type = 'SimpleRNN'
+        self.hidden_size = 128
+        self.task_mode = 'linear'
+        
+        self.wdecay = 0
+        self.batch_size = 64
+        self.max_batch = 10000
         self.print_mode = 'error'
 
 class FSCConfig(SupervisedLearningBaseConfig):
@@ -228,7 +207,7 @@ class FSCConfig(SupervisedLearningBaseConfig):
         
         self.test_batch = 200
         self.log_every = 1000
-        self.max_batch = 60000
+        self.max_batch = 40000
         self.hours = 24
         self.gpu_constraint = '11GB'
         self.use_lr_scheduler = True

@@ -44,8 +44,13 @@ def model_init(config_: BaseConfig, mode, net_num=None):
         model = models.CNN(config_)
     elif config_.model_type == 'RecurrentPolicy':
         model = models.RecurrentPolicy(config_)
+    elif config_.model_type == 'ActorCritic':
+        model = models.ActorCritic(config_)
     else:
         raise NotImplementedError("Model not Implemented")
+
+    if config_.load_path is not None:
+        model.load_state_dict(torch.load(config_.load_path))
         
     model.to(DEVICE)
     return model

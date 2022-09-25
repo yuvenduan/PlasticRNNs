@@ -8,15 +8,20 @@ import torch.nn as nn
 class PlasticParam(nn.Module):
 
 	lr_mode = 'uniform'
+	requires_param_grad = True
 
 	@classmethod
 	def set_elementwise_lr(cls, mode):
 		if mode is not None:
 			cls.lr_mode = mode
 
+	@classmethod
+	def set_param_grad(cls, mode=True):
+		cls.requires_param_grad = mode
+
 	def __init__(self, param: torch.Tensor):
 		super().__init__()
-		self.param = nn.Parameter(param)
+		self.param = nn.Parameter(param, requires_grad=self.requires_param_grad)
 		
 		if self.lr_mode == 'none':
 			self.lr = 1
@@ -35,7 +40,7 @@ class PlasticParam(nn.Module):
 		self.total_dim = np.prod(self.param.shape)
 
 	def forward(self) -> torch.Tensor:
-		assert torch.is_grad_enabled(), "Gradient must be enabled"
+		# assert torch.is_grad_enabled(), "Gradient must be enabled"
 		assert self.floatparam is not None, "Parameter not initialized"
 		return self.floatparam + self.param
 

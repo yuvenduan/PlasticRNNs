@@ -7,13 +7,11 @@ import torch
 import torch.optim.lr_scheduler as lrs
 
 from configs.config_global import USE_CUDA, LOG_LEVEL, NP_SEED, TCH_SEED
-from configs.configs import BaseConfig, SupervisedLearningBaseConfig
+from configs.configs import SupervisedLearningBaseConfig
 from utils.logger import Logger
 from datasets.data_sets import DatasetIters
 from utils.train_utils import grad_clipping, model_init, task_init
 from utils.config_utils import load_config
-from tasks.taskfunctions import data_batch_to_device
-from rl_train import rl_train
 
 def train_from_path(path):
     """Train from a path with a config file in it."""
@@ -23,61 +21,63 @@ def train_from_path(path):
 
 def model_eval(config, net, test_data, task_func, logger=None, eval=False, test=False):
 
-    net.eval()
-    extra_out = []
+    with torch.no_grad():
+        net.eval()
+        extra_out = []
 
-    correct = 0
-    total = 0
-    test_loss = 0.0
-    test_b = 0
-    test_data.reset()
-    
-    for t_step_ in range(test_data.min_iter_len):
-        loss_weighted, num_weighted, num_corr_weighted = 0, 0, 0
-        for i_tloader, test_iter in enumerate(test_data.data_iters):
-            mod_weight = config.mod_w[i_tloader]
+        correct = 0
+        total = 0
+        test_loss = 0.0
+        test_b = 0
+        test_data.reset()
+        
+        for t_step_ in range(test_data.min_iter_len):
+            loss_weighted, num_weighted, num_corr_weighted = 0, 0, 0
+            for i_tloader, test_iter in enumerate(test_data.data_iters):
+                mod_weight = config.mod_w[i_tloader]
 
-            t_data = next(test_iter)
-            result = task_func.roll(net, t_data, test=True)
-            loss, num, num_corr = result[: 3]
-            # extra_out.append(result)
+                t_data = next(test_iter)
+                result = task_func.roll(net, t_data, test=True)
+                loss, num, num_corr = result[: 3]
+                if config.do_analysis:
+                    extra_out.append(result)
 
-            loss *= mod_weight
-            num *= mod_weight
-            num_corr *= mod_weight
+                loss *= mod_weight
+                num *= mod_weight
+                num_corr *= mod_weight
 
-            loss_weighted += loss
-            num_weighted += num
-            num_corr_weighted += num_corr
+                loss_weighted += loss
+                num_weighted += num
+                num_corr_weighted += num_corr
 
-        test_loss += loss_weighted
-        total += num_weighted
-        correct += num_corr_weighted
+            test_loss += loss_weighted
+            total += num_weighted
+            correct += num_corr_weighted
 
-        test_b += 1
-        if test_b >= config.test_batch:
-            break
+            test_b += 1
+            if test_b >= config.test_batch:
+                break
 
-    if config.print_mode == 'accuracy':
-        test_acc = 100 * correct / total
-    else:
-        test_error = correct / total
+        if config.print_mode == 'accuracy':
+            test_acc = 100 * correct / total
+        else:
+            test_error = correct / total
 
-    avg_testloss = test_loss / test_b
+        avg_testloss = test_loss / test_b
 
-    logger.log_tabular('TestLoss', avg_testloss)
-    if config.print_mode == 'accuracy':
-        logger.log_tabular('TestAcc', test_acc)
-    else:
-        logger.log_tabular('TestError', test_error)
+        logger.log_tabular('TestLoss', avg_testloss)
+        if config.print_mode == 'accuracy':
+            logger.log_tabular('TestAcc', test_acc)
+        else:
+            logger.log_tabular('TestError', test_error)
 
-    if eval and hasattr(task_func, "after_validation_callback"):
-        task_func.after_validation_callback(extra_out, logger, config.save_path)
+        if hasattr(task_func, "after_validation_callback"):
+            task_func.after_validation_callback(extra_out, logger, config.save_path)
 
-    if config.print_mode == 'accuracy':
-        return avg_testloss, test_acc
-    else:
-        return avg_testloss, test_error
+        if config.print_mode == 'accuracy':
+            return avg_testloss, test_acc
+        else:
+            return avg_testloss, test_error
         
 
 def model_train(config: SupervisedLearningBaseConfig):
@@ -97,8 +97,7 @@ def model_train(config: SupervisedLearningBaseConfig):
                     exp_name=config.experiment_name)
 
     if config.training_mode == 'RL':
-        rl_train(config, net, logger)
-        return
+        raise NotImplementedError
 
     # gradient clipping
     if config.grad_clip is not None:
