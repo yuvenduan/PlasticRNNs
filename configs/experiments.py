@@ -3,19 +3,9 @@ format adapted from https://github.com/gyyang/olfaction_evolution
 
 Each experiment is described by a function that returns a list of configurations
 function name is the experiment name
-
-combinatorial mode:
-    config_ranges should not have repetitive values
-sequential mode:
-    config_ranges values should have equal length,
-    otherwise this will only loop through the shortest one
-control mode:
-    base_config must contain keys in config_ranges
 """
 
 from collections import OrderedDict
-from socket import CAN_RTR_FLAG
-from turtle import delay
 from configs.configs import BaseConfig, ClassificationPretrainConfig, CueRewardConfig, FSCConfig, RegressionConfig, SeqReproductionConfig, ContrastivePretrainConfig
 from utils.config_utils import vary_config
 from copy import deepcopy
@@ -274,6 +264,52 @@ def seqreproduction_long_compare_delay_test():
                 new_configs[key].append(cfg)
 
     return new_configs
+
+def seqreproduction_norm():
+    config = SeqReproductionConfig()
+    config.experiment_name = 'seqreproduction_norm'
+    config.delay = 40
+    config.seq_length = 5
+    
+    config_ranges = OrderedDict()
+    config_ranges['rnn'] = ['RNN', ]
+    config_ranges['plasticity_mode'] = ['gradient', 'hebbian', ]
+    config_ranges['inner_grad_clip'] = [1, 100, ]
+
+    configs = vary_config(config, config_ranges, mode='combinatorial', num_seed=4)
+
+    scale_modelsize(configs)
+    scale_rnn_modelsize(configs)
+
+    for key, cfgs in configs.items():
+        for cfg in cfgs:
+            if cfg.delay >= 40 and cfg.plasticity_mode != 'none':
+                cfg.gpu_constraint = '18GB'
+
+    return configs
+
+def seqreproduction_weight_clip():
+    config = SeqReproductionConfig()
+    config.experiment_name = 'seqreproduction_weight_clip'
+    config.delay = 40
+    config.seq_length = 5
+    
+    config_ranges = OrderedDict()
+    config_ranges['rnn'] = ['RNN', ]
+    config_ranges['plasticity_mode'] = ['hebbian', ]
+    config_ranges['weight_clip'] = [0.01, 0.1, 1, ]
+
+    configs = vary_config(config, config_ranges, mode='combinatorial', num_seed=4)
+
+    scale_modelsize(configs)
+    scale_rnn_modelsize(configs)
+
+    for key, cfgs in configs.items():
+        for cfg in cfgs:
+            if cfg.delay >= 40 and cfg.plasticity_mode != 'none':
+                cfg.gpu_constraint = '18GB'
+
+    return configs
 
 def cuereward_large_test():
     configs = cuereward_large()

@@ -59,8 +59,10 @@ class BaseConfig(object):
         self.input_shape = (1, )
         # output size of the model, which is the number of classes in classification tasks
         self.model_outsize = 10 
+        
         self.hidden_size = 128
         self.layernorm = False
+        self.weight_clip = None
 
     @property
     def test_begin(self):

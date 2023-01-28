@@ -1,5 +1,5 @@
 #!/bin/bash
-for jobid in {25811063..25811160}
+for jobid in {27744436..27744459}
 do
     scancel $jobid
 done

@@ -465,6 +465,17 @@ def cuereward_inner_lr_mode_analysis():
                 fig_name=f'inner_lr_{rule}_{rnn}'
             )
 
+            if rule == 'gradient' and rnn == 'LSTM':
+                plots.error_range_plot(
+                    x_axis,
+                    [performance[0], performance[-1], ],
+                    x_label='Training Step',
+                    y_label='Validation Loss',
+                    label_list=['Without $\\alpha$', 'With $\\alpha$'],
+                    fig_dir='cuereward',
+                    fig_name=f'inner_lr_{rule}_{rnn}_extra'
+                )
+
 def cuereward_lr_analysis():
     cfgs = experiments.cuereward_lr()
 

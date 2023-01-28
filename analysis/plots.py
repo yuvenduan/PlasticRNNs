@@ -24,12 +24,8 @@ if not osp.exists(FIG_DIR):
 def adjust_figure(ax=None):
     if ax is None:
         ax = plt.gca()
-    # Hide the right and top spines
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
-    # Only show ticks on the left and bottom spines
-    # ax.yaxis.set_ticks_position('left')
-    # ax.xaxis.set_ticks_position('bottom')
     plt.tight_layout(pad=0.5)
 
 def heatmap(data, row_labels, col_labels, ax=None,
@@ -148,7 +144,7 @@ def annotate_heatmap(im, data=None, valfmt="{x:.2f}",
     return texts
 
 def get_sem(data):
-    return np.std(data) / np.sqrt(len(data))
+    return np.std(data, ddof=1) / np.sqrt(len(data))
 
 def errorbar_plot(
     x_axis, 

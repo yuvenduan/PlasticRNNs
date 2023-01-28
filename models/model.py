@@ -49,6 +49,7 @@ class SimpleRNN(models.PlasticModule):
         self.lr = config.p_lr
         self.wd = config.p_wd
         self.grad_clip = config.inner_grad_clip
+        self.weight_clip = config.weight_clip
 
         self.use_layernorm = config.layernorm
         if self.use_layernorm:
@@ -87,6 +88,8 @@ class SimpleRNN(models.PlasticModule):
 
         if self.dim > 0:
             floatparam = self.update_floatparam(loss, lr, wd, self.grad_clip, mode=self.plasticity_mode)
+            if self.weight_clip is not None:
+                floatparam = torch.clip(floatparam, -self.weight_clip, self.weight_clip)
             h = torch.cat([floatparam, h], dim=1)
 
         info = dict(
