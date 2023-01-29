@@ -2,9 +2,11 @@ import os
 import subprocess
 import argparse
 import logging
+import time
 
 import configs.experiments as experiments
 import configs.exp_analysis as exp_analysis
+import torch
 from utils.config_utils import save_config, configs_dict_unpack
 from train import model_train
 from configs.config_global import LOG_LEVEL
@@ -28,7 +30,7 @@ def analysis_cmd(exp_name):
     return command
 
 
-def get_jobfile(cmd, job_name, dep_ids, email=False,
+def get_jobfile(cmd, job_name, dep_ids, 
                 sbatch_path='./sbatch/', hours=8, partition='normal', 
                 mem=32, gpu_constraint='high-capacity', cpu=2):
     """
@@ -39,7 +41,6 @@ def get_jobfile(cmd, job_name, dep_ids, email=False,
         cmd: python command to be execute by the cluster
         job_name: str, name of the job file
         dep_ids: list, a list of job ids used for job dependency
-        email: bool, whether or to send email about job status
         sbatch_path : str, Directory to store SBATCH file in.
         hours : int, number of hours to train
     Returns:
@@ -54,7 +55,6 @@ def get_jobfile(cmd, job_name, dep_ids, email=False,
         dependency_line = '#SBATCH --dependency=afterok:' \
                           + ':'.join(dep_ids) + '\n'
 
-    email_line = ''
     os.makedirs(sbatch_path, exist_ok=True)
     job_file = os.path.join(sbatch_path, job_name + '.sh')
 
@@ -71,9 +71,7 @@ def get_jobfile(cmd, job_name, dep_ids, email=False,
             + '#SBATCH -e ./sbatch/slurm-%j.out\n'
             + '#SBATCH -o ./sbatch/slurm-%j.out\n'
             + dependency_line
-            + email_line
             + '\n'
-            + 'module load openmind/cuda/11.1\n'
             + 'source ~/.bashrc\n'
             + 'conda activate plastic\n'
             + 'cd /om2/user/duany19/generalized_hebbian\n'
@@ -83,15 +81,24 @@ def get_jobfile(cmd, job_name, dep_ids, email=False,
         print(job_file)
     return job_file
 
+def get_idle_gpu(subprocess_list):
+    while True:
+        for idx, pipe in enumerate(subprocess_list):
+            if pipe is not None and pipe.poll() is not None:
+                print("Experiment completed with code", pipe.poll(), file=True)
+                pipe = None
+            if pipe == None:
+                return idx
+        time.sleep(10)
 
-def train_experiment(experiment, on_cluster, use_exp_array, partition):
+def train_experiment(experiment, on_cluster, on_server, partition):
     """Train model across platforms given experiment name.
     adapted from https://github.com/gyyang/olfaction_evolution
     Args:
         experiment: str, name of experiment to be run
             must correspond to a function in experiments.py
         on_cluster: bool, whether to run experiments on cluster
-        use_exp_array: use dependency between training of different exps
+        on_server: bool, if use on server
 
     Returns:
         return_ids: list, a list of job ids that are last in the dependency sequence
@@ -105,78 +112,60 @@ def train_experiment(experiment, on_cluster, use_exp_array, partition):
         raise ValueError('Experiment config not found: ', experiment)
 
     return_ids = []
-    if not use_exp_array:
-        # exp_configs is a list of configs
-        exp_configs = configs_dict_unpack(exp_configs)
-        assert isinstance(exp_configs[0], BaseConfig), \
-            'exp_configs should be list of configs'
+    
+    # exp_configs is a list of configs
+    exp_configs = configs_dict_unpack(exp_configs)
+    assert isinstance(exp_configs[0], BaseConfig), \
+        'exp_configs should be list of configs'
 
-        if on_cluster:
-            for config in exp_configs:
-                if not save_config(config, config.save_path):
-                    continue
-                python_cmd = train_cmd(config)
-                job_n = config.experiment_name + '_' + config.model_name
-                cp_process = subprocess.run(['sbatch', get_jobfile(python_cmd,
-                                                                   job_n,
-                                                                   dep_ids=[],
-                                                                   hours=config.hours, 
-                                                                   partition=partition,
-                                                                   mem=config.mem,
-                                                                   gpu_constraint=config.gpu_constraint,
-                                                                   cpu=config.cpu,
-                                                                   sbatch_path=config.save_path
-                                                                   )],
-                                            capture_output=True, check=True)
-                cp_stdout = cp_process.stdout.decode()
-                print(cp_stdout)
-                job_id = cp_stdout[-9:-1]
-                return_ids.append(job_id)
-        else:
-            for config in exp_configs:
-                if save_config(config, config.save_path):
-                    model_train(config)
+    if on_cluster:
+        for config in exp_configs:
+            if not save_config(config, config.save_path):
+                continue
+            python_cmd = train_cmd(config)
+            job_n = config.experiment_name + '_' + config.model_name
+            cp_process = subprocess.run(['sbatch', get_jobfile(python_cmd,
+                                                                job_n,
+                                                                dep_ids=[],
+                                                                hours=config.hours, 
+                                                                partition=partition,
+                                                                mem=config.mem,
+                                                                gpu_constraint=config.gpu_constraint,
+                                                                cpu=config.cpu,
+                                                                sbatch_path=config.save_path
+                                                                )],
+                                        capture_output=True, check=True)
+            cp_stdout = cp_process.stdout.decode()
+            print(cp_stdout)
+            job_id = cp_stdout[-9:-1]
+            return_ids.append(job_id)
+
+    elif on_server:
+
+        num_gpus = torch.cuda.device_count()
+        print(f"Training on {num_gpus} gpu(s) ...", flush=True)
+        subprocesses = [None for _ in range(num_gpus)]
+
+        for config in exp_configs:
+            if not save_config(config, config.save_path):
+                continue
+            id = get_idle_gpu(subprocesses)
+            cmd = f'export CUDA_VISIBLE_DEVICES={id}' + '\n' + train_cmd(config)
+            out_path = os.path.join(config.save_path, 'out.txt')
+            out_file = open(out_path, mode='w')
+            subprocesses[id] = subprocess.Popen(cmd, stdout=out_file, stderr=out_file, shell=True)
+
+        for pipe in subprocesses:
+            if pipe is not None:
+                if pipe.poll() is None:
+                    print("Experiment completed with code", pipe.wait())
+                else:
+                    print("Experiment completed with code", pipe.poll())
+
     else:
-        exp_configs = [configs_dict_unpack(cfg_dict) for cfg_dict in exp_configs]
-        # exp_configs is a list of lists of configs
-        assert isinstance(exp_configs[0], list) \
-               and isinstance(exp_configs[0][0], BaseConfig), \
-               'exp_configs should a list of lists of configs'
-
-        if on_cluster:
-            send_email = False
-            pre_job_ids = []
-            for group_num, config_group in enumerate(exp_configs):
-                group_job_ids = []
-                for config in config_group:
-                    if not save_config(config, config.save_path):
-                        continue
-
-                    if group_num == len(exp_configs) - 1:
-                        send_email = True
-
-                    python_cmd = train_cmd(config)
-                    job_n = config.experiment_name + '_' + config.model_name
-                    cp_process = subprocess.run(['sbatch',
-                                                 get_jobfile(python_cmd, job_n,
-                                                             dep_ids=pre_job_ids,
-                                                             email=send_email,
-                                                             hours=config.hours, 
-                                                             partition=partition)], # TODO: Update this line
-                                                capture_output=True, check=True)
-                    cp_stdout = cp_process.stdout.decode()
-                    print(cp_stdout)
-                    job_id = cp_stdout[-9:-1]
-                    group_job_ids.append(job_id)
-                pre_job_ids = group_job_ids
-
-            return_ids = pre_job_ids
-
-        else:
-            for config_group in exp_configs:
-                for config in config_group:
-                    if save_config(config, config.save_path):
-                        model_train(config)
+        for config in exp_configs:
+            if save_config(config, config.save_path):
+                model_train(config)
 
     return return_ids
 
@@ -212,15 +201,17 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-t', '--train', nargs='+', help='Train experiments', default=[])
     parser.add_argument('-a', '--analyze', nargs='+', help='Analyze experiments', default=[])
-    parser.add_argument('-c', '--cluster', action='store_true', help='Use batch submission on cluster')
+    parser.add_argument('-c', '--cluster', action='store_true', help='Use batch submission on Slurm cluster')
+    parser.add_argument('-s', '--server', action='store_true', help='Run experiments on a Linux server with multiple GPUs')
     parser.add_argument('-p', '--partition', default='normal', help='Partition of resource on cluster to use')
     
     args = parser.parse_args()
     experiments2train = args.train
     experiments2analyze = args.analyze
     use_cluster = args.cluster
-    # on openmind cluster
-    # use_cluster = 'node' in platform.node() or 'dgx' in platform.node()
+    use_server = args.server
+    assert not (use_cluster and use_server), "Either use cluster or directly run on a server"
+
     logging.basicConfig(level=LOG_LEVEL)
 
     # evaluation jobs are executed after training jobs,
@@ -228,9 +219,7 @@ if __name__ == '__main__':
     train_ids = []
     if experiments2train:
         for exp in experiments2train:
-            exp_array = '_exp_array' in exp
-            exp_ids = train_experiment(exp, on_cluster=use_cluster,
-                                       use_exp_array=exp_array, partition=args.partition)
+            exp_ids = train_experiment(exp, on_cluster=use_cluster, on_server=use_server, partition=args.partition)
             train_ids += exp_ids
 
     if experiments2analyze:

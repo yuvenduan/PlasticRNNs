@@ -41,7 +41,6 @@ def cuereward_demo():
 
     configs = vary_config(config, config_ranges, mode='combinatorial', num_seed=1)
     scale_modelsize(configs, 1.5)
-    scale_rnn_modelsize(configs)
 
     return configs
 

@@ -13,9 +13,9 @@ from configs import experiments
 
 def all_analysis():
 
+    cuereward_large_analysis()
     cuereward_extradim_analysis()
     cuereward_inner_lr_mode_analysis()
-    cuereward_large_analysis()
     cuereward_lr_curves_analysis()
     cuereward_modulation_analysis()
     cuereward_plr_analysis()
@@ -137,6 +137,31 @@ def get_test_mean_ci(cfgs, idx, cfgs2=None, key='TestAcc'):
         check_complete=(cfgs2 is not None), cfgs2=cfgs2
     )
     return np.mean(performance), plots.get_sem(performance) * 1.96
+
+def cuereward_demo_analysis():
+    
+    cfgs = experiments.cuereward_demo()
+    model_list = ['RNN', ]
+    rule_list = ['gradient', 'hebbian', 'none', ]
+    performance = []
+
+    for i, model in enumerate(model_list):
+
+        performance = []
+        for k, rule in enumerate(rule_list):
+            curve, x_axis = get_curve(cfgs, i * 3 + k, key='TestLoss', start=1)
+            performance.append(curve)
+
+        plots.error_range_plot(
+            x_axis,
+            performance,
+            x_label='Training Step',
+            y_label='Validation Loss',
+            label_list=rule_list,
+            fig_dir='cuereward',
+            fig_name=f'curves_demo',
+            fig_size=(5, 4)
+        )
 
 def seqreproduction_long_compare_delay_analysis():
     cfgs = experiments.seqreproduction_long_compare_delay()
