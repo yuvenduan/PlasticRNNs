@@ -34,6 +34,7 @@ def cuereward_demo():
 
     config.experiment_name = 'cuereward_demo'
     config.max_batch = 5000
+    config.num_workers = 0
 
     config_ranges = OrderedDict()
     config_ranges['rnn'] = ['RNN', ]
