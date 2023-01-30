@@ -9,7 +9,7 @@ import configs.exp_analysis as exp_analysis
 import torch
 from utils.config_utils import save_config, configs_dict_unpack
 from train import model_train
-from configs.config_global import LOG_LEVEL
+from configs.config_global import LOG_LEVEL, ROOT_DIR
 from configs.configs import BaseConfig
 
 def train_cmd(config_):
@@ -74,7 +74,7 @@ def get_jobfile(cmd, job_name, dep_ids,
             + '\n'
             + 'source ~/.bashrc\n'
             + 'conda activate plastic\n'
-            + 'cd /om2/user/duany19/generalized_hebbian\n'
+            + f'cd {ROOT_DIR}\n'
             + cmd + '\n'
             + '\n'
             )
@@ -85,7 +85,7 @@ def get_idle_gpu(subprocess_list):
     while True:
         for idx, pipe in enumerate(subprocess_list):
             if pipe is not None and pipe.poll() is not None:
-                print("Experiment completed with code", pipe.poll(), file=True)
+                print("Experiment completed with code", pipe.poll(), flush=True)
                 pipe = None
             if pipe == None:
                 return idx

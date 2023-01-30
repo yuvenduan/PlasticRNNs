@@ -163,6 +163,10 @@ def errorbar_plot(
     color_list=colors,
     add=0
 ):
+    """
+    A general plot for error range
+    :param data_list: list of shpae (# curves, length of the x-axis, # seeds)
+    """
     
     plt.figure(figsize=figsize)
 

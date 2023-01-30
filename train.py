@@ -210,6 +210,7 @@ def model_train(config: SupervisedLearningBaseConfig):
 
     if config.perform_test:
 
+        # ensure the test set is the same for different random runs
         np.random.seed(NP_SEED)
         torch.manual_seed(TCH_SEED)
         random.seed(0)

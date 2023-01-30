@@ -13,4 +13,4 @@ FIG_DIR = osp.join(ROOT_DIR, 'figures')
 USE_CUDA = torch.cuda.is_available()
 DEVICE = torch.device("cuda" if USE_CUDA else "cpu")
 MAP_LOC = "cuda:0" if USE_CUDA else torch.device('cpu')
-LOG_LEVEL = logging.INFO
+LOG_LEVEL = logging.info

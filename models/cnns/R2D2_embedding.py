@@ -1,3 +1,6 @@
+# Adapted from Meta-Learning with Differentiable Convex Optimization, CVPR 2019
+# https://github.com/kjunelee/MetaOptNet
+
 import torch.nn as nn
 import torch
 
