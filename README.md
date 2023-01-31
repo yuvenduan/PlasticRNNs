@@ -1,4 +1,4 @@
-Official implementation of the paper:
+Official implementation for the paper:
 
 [Hebbian and Gradient-based Plasticity Enables Robust Memory and Rapid Learning in RNNs ](https://openreview.net/forum?id=2WklawyeI08)
 
@@ -30,7 +30,7 @@ As a demo for the cue-reward association task, run:
 ```bash
 python main.py -t cuereward_demo
 ```
-If you have multiple GPUs on your machine, you can add <code>-s</code> so that experiments could be ran concurrently. If you are using a slurm cluster, you can add <code>-c</code> so that experiments will be submitted to the cluster. 
+If you have multiple GPUs on your machine, you can add <code>-s</code> so that experiments could be run concurrently. If you are using a slurm cluster, you can add <code>-c</code> so that experiments will be submitted to the cluster. 
 
 During training, progress can be found in <code>experiments/cuereward_demo/.../progress.txt</code>. After training, try
 ```bash
@@ -42,7 +42,7 @@ to plot the training curves. The result is stored as <code>figures/cuereward/cur
   <img src='curves_demo.png' width="400px">
 </p>
 
-Configurations for all experiments in the paper can be found at <code>configs/experiments.py</code>, whereas the analyses can be found at <code>configs/exp_analysis.py</code>. These experiments and analyses can be ran similarly.
+Configurations for all experiments in the paper can be found at <code>configs/experiments.py</code>, whereas the analyses can be found at <code>configs/exp_analysis.py</code>. These experiments and analyses can be run similarly.
 
 ## Acknowledgments
 
