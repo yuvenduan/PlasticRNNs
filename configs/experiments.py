@@ -106,37 +106,6 @@ def cuereward_large():
 
     return configs
 
-def cuereward_random_network():
-    config = CueRewardConfig()
-
-    config.random_network = True
-    config.experiment_name = 'cuereward_random_network'
-
-    config_ranges = OrderedDict()
-    config_ranges['rnn'] = ['RNN', 'LSTM', ]
-    config_ranges['plasticity_mode'] = ['gradient', 'hebbian', ]
-    config_ranges['inner_lr_mode'] = ['uniform', 'neg_uniform', 'random']
-
-    configs = vary_config(config, config_ranges, mode='combinatorial', num_seed=4)
-    scale_modelsize(configs, 1.5)
-    scale_rnn_modelsize(configs)
-
-    return configs
-
-def cuereward_noisy():
-    config = CueRewardConfig()
-    config.input_noise = 0.5
-    config.experiment_name = 'cuereward_noisy'
-
-    config_ranges = OrderedDict()
-    config_ranges['rnn'] = ['RNN', 'LSTM', ]
-    config_ranges['plasticity_mode'] = ['gradient', 'hebbian', 'none',  ]
-
-    configs = vary_config(config, config_ranges, mode='combinatorial', num_seed=4)
-    scale_modelsize(configs, 1.5)
-    scale_rnn_modelsize(configs)
-    return configs
-
 def cuereward_modulation():
     config = CueRewardConfig()
     config.experiment_name = 'cuereward_modulation'
@@ -288,29 +257,6 @@ def seqreproduction_norm():
 
     return configs
 
-def seqreproduction_weight_clip():
-    config = SeqReproductionConfig()
-    config.experiment_name = 'seqreproduction_weight_clip'
-    config.delay = 40
-    config.seq_length = 5
-    
-    config_ranges = OrderedDict()
-    config_ranges['rnn'] = ['RNN', ]
-    config_ranges['plasticity_mode'] = ['hebbian', ]
-    config_ranges['weight_clip'] = [0.01, 0.1, 1, ]
-
-    configs = vary_config(config, config_ranges, mode='combinatorial', num_seed=4)
-
-    scale_modelsize(configs)
-    scale_rnn_modelsize(configs)
-
-    for key, cfgs in configs.items():
-        for cfg in cfgs:
-            if cfg.delay >= 40 and cfg.plasticity_mode != 'none':
-                cfg.gpu_constraint = '18GB'
-
-    return configs
-
 def cuereward_large_test():
     configs = cuereward_large()
     new_configs = {}
@@ -447,33 +393,6 @@ def fsc_resnet():
 
     return configs
 
-def fsc_simclr_pretrain():
-    config = FSCConfig()
-    config.experiment_name = 'fsc_simclr_pretrain'
-    config.cnn_pretrain = 'contrastive'
-    config.pretrain_step = 100000
-    config.freeze_pretrained_cnn = False
-    config.gpu_constraint = '18GB'
-
-    config_ranges = OrderedDict()
-    config_ranges['image_dataset'] = ['miniImageNet', 'CIFAR_FS', ]
-    config_ranges['cnn'] = ['ResNet', ]
-    config_ranges['plasticity_mode'] = ['gradient', 'hebbian', 'none', ]
-    config_ranges['rnn'] = ['LSTM', 'RNN']
-
-    configs = vary_config(config, config_ranges, mode='combinatorial', num_seed=4)
-
-    scale_modelsize(configs)
-    scale_rnn_modelsize(configs)
-    configure_image_dataset(configs)
-
-    for key, cfgs in configs.items():
-        for cfg in cfgs:
-            if cfg.image_dataset == 'miniImageNet':
-                cfg.gpu_constraint = '80GB'
-
-    return configs
-
 def configure_image_dataset(configs, set_outsize=False):
     for seed, cfgs in configs.items():
         for config in cfgs:
@@ -489,39 +408,3 @@ def configure_image_dataset(configs, set_outsize=False):
                 config.input_shape = (3, 32, 32)
             else:
                 raise NotImplementedError("Image Dataset Not Implemented")
-
-def classification_pretrain():
-    config = ClassificationPretrainConfig()
-    config.experiment_name = 'classification_pretrain'
-
-    config.gpu_constraint = '11GB'
-    config.save_every = 1000
-    config.max_batch = 10000
-
-    config_ranges = OrderedDict()
-    config_ranges['image_dataset'] = ['miniImageNet', 'CIFAR_FS', ]
-    config_ranges['cnn'] = ['ResNet', 'ProtoNet']
-
-    configs = vary_config(config, config_ranges, mode='combinatorial', num_seed=4)
-    configure_image_dataset(configs, True)
-
-    return configs
-
-def contrastive_pretrain():
-    config = ContrastivePretrainConfig()
-    config.experiment_name = 'contrastive_pretrain'
-    config.gpu_constraint = '11GB'
-
-    config_ranges = OrderedDict()
-    config_ranges['image_dataset'] = ['miniImageNet', 'CIFAR_FS', ]
-    config_ranges['cnn'] = ['ResNet', 'ProtoNet']
-
-    configs = vary_config(config, config_ranges, mode='combinatorial', num_seed=4)
-    configure_image_dataset(configs)
-
-    for key, cfgs in configs.items():
-        for cfg in cfgs:
-            if cfg.image_dataset == 'miniImageNet' and cfg.cnn == 'ResNet':
-                cfg.gpu_constraint = '18GB'
-
-    return configs

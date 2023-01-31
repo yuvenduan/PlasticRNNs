@@ -23,6 +23,7 @@ class PlasticParam(nn.Module):
 		super().__init__()
 		self.param = nn.Parameter(param, requires_grad=self.requires_param_grad)
 		
+		# initialize connection-wise learning rates according to the configuration
 		if self.lr_mode == 'none':
 			self.lr = 1
 		elif self.lr_mode == 'uniform':
@@ -84,6 +85,7 @@ class PlasticModule(nn.Module):
 	def update_floatparam(self, loss, lr, wd, max_norm, mode='gradient') -> torch.Tensor:
 		params = self.floatparams()
 
+		# calculate how params change at the current time step
 		if mode == 'gradient':
 			floatparams = [param.floatparam for param in params]
 			grads = torch.autograd.grad(loss, floatparams, create_graph=True)
@@ -100,6 +102,7 @@ class PlasticModule(nn.Module):
 		else:
 			raise NotImplementedError(mode)
 
+		# shrink the learning rate according the norm
 		norm = 0
 		for grad in grads:
 			norm = norm + grad.square().sum(dim=tuple(range(1, grad.dim())))
@@ -112,6 +115,7 @@ class PlasticModule(nn.Module):
 			lrs.append(lrs[-1].unsqueeze(-1))
 			wds.append(wds[-1].unsqueeze(-1))
 
+		# calculate new params
 		new_param_list = []
 		for grad, param in zip(grads, params):
 			new_param = (1 - wds[param.param.dim()]) * param.floatparam + lrs[param.param.dim()] * grad * param.lr

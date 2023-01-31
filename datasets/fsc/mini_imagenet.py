@@ -8,8 +8,6 @@ import os.path
 import numpy as np
 import random
 import pickle
-import json
-import math
 
 import torch
 import torch.utils.data as data
@@ -19,10 +17,7 @@ import torchvision.transforms as transforms
 import torchnet as tnt
 
 from PIL import Image
-from PIL import ImageEnhance
-
 from pdb import set_trace as breakpoint
-
 
 # Set the appropriate paths of the datasets here.
 _MINI_IMAGENET_DATASET_DIR = 'data/miniImageNet'

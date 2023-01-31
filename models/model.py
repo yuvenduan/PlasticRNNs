@@ -57,14 +57,18 @@ class SimpleRNN(models.PlasticModule):
 
     def _forward(self, input, hidden):
 
+        # hidden contains two parts: the plastic weights and the hidden state of the RNN
+
+        # set the plastic weights
         if self.dim > 0:
-            self.set_floatparam(hidden[:, :self.dim])
+            self.set_floatparam(hidden[:, :self.dim]) 
 
         if not self.custom_input:
             x = self.in_fc(input)
         else:
             x = input
 
+        # pass the input and the hidden state to the RNN
         if self.rnn_type == 'LSTM':
             x, h = self.rnn(x, (hidden[:, self.dim: -self.hidden_size], hidden[:, -self.hidden_size: ]))
             if self.use_layernorm:
@@ -77,8 +81,11 @@ class SimpleRNN(models.PlasticModule):
                 h = self.layernorm(h)
             x = self.out_fc(h)
 
+        # calculate internal loss
         loss = F.mse_loss(x * self.out_weight, torch.zeros_like(x))
 
+        # calculate internal learning rate / weight decay
+        # by default, they are modulated by model output
         lr = torch.full_like(x[:, -1], self.lr)
         wd = torch.full_like(x[:, -1], self.wd)
 
@@ -86,12 +93,14 @@ class SimpleRNN(models.PlasticModule):
             lr = lr * torch.sigmoid(x[:, -1]) * 2
             wd = wd * torch.sigmoid(x[:, -1]) * 2
 
+        # update the plastic weights, if there are any
         if self.dim > 0:
             floatparam = self.update_floatparam(loss, lr, wd, self.grad_clip, mode=self.plasticity_mode)
             if self.weight_clip is not None:
                 floatparam = torch.clip(floatparam, -self.weight_clip, self.weight_clip)
             h = torch.cat([floatparam, h], dim=1)
 
+        # infomation used in some analysis
         info = dict(
             lr=lr.detach().cpu(),
             wd=wd.detach().cpu(),
@@ -144,7 +153,7 @@ class CNNtoRNN(SimpleRNN):
 class CNN(nn.Module):
 
     def __init__(self, config: BaseConfig):
-        assert len(config.input_shape) == 3, "input must be 3-dim for CNNtoRNN"
+        assert len(config.input_shape) == 3, "input must be 3-dim for CNN"
 
         super().__init__()
         self.cnn = get_cnn(config.cnn, config)
